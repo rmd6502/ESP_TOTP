@@ -1,8 +1,13 @@
 #include "AiEsp32RotaryEncoder.h"
 #include <BleKeyboard.h>
+#define _WIFIMGR_LOGLEVEL_    3
+#include <ESP_WiFiManager.h>
+#include <NTPClient.h>
 #include <SPI.h>
-#include <TFT_eSPI.h>
 #include <SPIFFS.h>
+#include <TOTP.h>
+#include <TFT_eSPI.h>
+#include <WiFi.h>
 
 #include "secrets.h"
 
@@ -17,10 +22,13 @@ AiEsp32RotaryEncoder rotaryEncoder = AiEsp32RotaryEncoder(ROTARY_ENCODER_A_PIN, 
 TFT_eSPI tft = TFT_eSPI(135, 240); // Invoke custom library
 
 BleKeyboard kb;
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP);
 
 char buff[512];
 
 std::vector<Secret> secrets;
+uint8_t selected = 0;
 
 void menuize(int curr, std::vector<Secret> &secrets);
 
@@ -35,7 +43,7 @@ void rotary_loop()
   }
   if (rotaryEncoder.isEncoderButtonClicked())
   {
-    //rotary_onButtonClick();
+    rotary_onButtonClick();
   }
 }
 
@@ -77,13 +85,28 @@ void menuize(int curr, std::vector<Secret> &secrets) {
     //tft.fillRoundRect(0,(curr - menuoffset) * tft.fontHeight(),tft.textWidth(secrets[curr].issuer.c_str()),8,2,TFT_PINK);
     tft.setTextColor(TFT_BLACK, TFT_PINK);
     tft.drawString(secrets[curr].issuer.c_str(),0,(curr - menuoffset) * tft.fontHeight() + 8);
-    if (last > -1 && last >= menuoffset && last + menuoffset <= screenHeight) {
+    if (last > -1 && last != curr && last >= menuoffset && last + menuoffset <= screenHeight) {
       //tft.fillRoundRect(0,(last - menuoffset) * tft.fontHeight(),tft.textWidth(secrets[last].issuer.c_str()),8,2,TFT_BLACK);
       tft.setTextColor(TFT_GREEN, TFT_BLACK);
       tft.drawString(secrets[last].issuer.c_str(),0,last * tft.fontHeight() + 8);
     }
   }
+  selected = curr;
   last = curr;
+}
+
+void rotary_onButtonClick() {
+  
+  auto secret = secrets[selected];
+  auto data = secret.secretBytes.data();
+  TOTP totp(data, secret.secretBytes.size() , 30);
+
+  auto code = totp.getCode(timeClient.getEpochTime());
+  Serial.print("Code ");
+  Serial.println(code);
+  if (kb.isConnected()) {
+    kb.print(code);
+  }
 }
 
 void setup()
@@ -123,9 +146,13 @@ void setup()
     bool circleValues = true;
     rotaryEncoder.setBoundaries(0, secrets.size(), circleValues);
     menuize(0, secrets);
+    ESP_WiFiManager ESP_wifiManager("TOTPAP");
+    ESP_wifiManager.autoConnect("TOTPAP");
 }
 
 void loop()
 {
     rotary_loop();
+    // update the time 
+    timeClient.update();
 }
