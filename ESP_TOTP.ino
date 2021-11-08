@@ -9,6 +9,8 @@
 #include <TFT_eSPI.h>
 #include <WiFi.h>
 
+#include <driver/rtc_io.h>
+
 #include "secrets.h"
 
 #define ROTARY_ENCODER_A_PIN 26
@@ -24,6 +26,9 @@ TFT_eSPI tft = TFT_eSPI(135, 240); // Invoke custom library
 BleKeyboard kb;
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
+uint32_t lastInputTime = 0;
+
+#define SLEEP_TIME 10000
 
 char buff[512];
 
@@ -37,12 +42,14 @@ void rotary_loop()
   //dont print anything unless value changed
   if (rotaryEncoder.encoderChanged())
   {
+    lastInputTime = millis();
     Serial.print("Value: ");
     Serial.println(rotaryEncoder.readEncoder());
     menuize(rotaryEncoder.readEncoder(), secrets);
   }
   if (rotaryEncoder.isEncoderButtonClicked())
   {
+    lastInputTime = millis();
     rotary_onButtonClick();
   }
 }
@@ -96,7 +103,6 @@ void menuize(int curr, std::vector<Secret> &secrets) {
 }
 
 void rotary_onButtonClick() {
-  
   auto secret = secrets[selected];
   auto data = secret.secretBytes.data();
   TOTP totp(data, secret.secretBytes.size() , 30);
@@ -113,7 +119,11 @@ void setup()
 {
     Serial.begin(115200);
     Serial.println("Start");
-
+    Serial.println(esp_sleep_get_wakeup_cause());
+    rtc_gpio_deinit(GPIO_NUM_25);
+    rtc_gpio_deinit(GPIO_NUM_33);
+    Serial.print("gpio25 "); Serial.println(digitalRead(25));
+    
     kb.begin();
 
     pinMode(ROTARY_ENCODER_GND_PIN, OUTPUT);
@@ -148,10 +158,22 @@ void setup()
     menuize(0, secrets);
     ESP_WiFiManager ESP_wifiManager("TOTPAP");
     ESP_wifiManager.autoConnect("TOTPAP");
+    lastInputTime = millis();
 }
 
 void loop()
 {
+  if (millis() - lastInputTime >= SLEEP_TIME) {
+    Serial.println("Sleep");
+    Serial.print("gpio25 "); Serial.println(digitalRead(25));
+    digitalWrite(TFT_BL, LOW);
+    tft.writecommand(TFT_DISPOFF);
+    tft.writecommand(TFT_SLPIN);
+    //esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_TIMER);
+    rtc_gpio_pullup_en(GPIO_NUM_33);
+    esp_sleep_enable_ext0_wakeup(GPIO_NUM_25, 0);
+    esp_deep_sleep_start();
+  }
     rotary_loop();
     // update the time 
     timeClient.update();
