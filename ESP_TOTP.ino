@@ -121,6 +121,7 @@ void setup()
     Serial.println("Start");
     Serial.println(esp_sleep_get_wakeup_cause());
     rtc_gpio_deinit(GPIO_NUM_25);
+    rtc_gpio_deinit(GPIO_NUM_32);
     rtc_gpio_deinit(GPIO_NUM_33);
     Serial.print("gpio25 "); Serial.println(digitalRead(25));
     
@@ -170,7 +171,9 @@ void loop()
     tft.writecommand(TFT_DISPOFF);
     tft.writecommand(TFT_SLPIN);
     //esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_TIMER);
+    //rtc_gpio_pullup_en(GPIO_NUM_25);
     rtc_gpio_pullup_en(GPIO_NUM_33);
+    rtc_gpio_pulldown_en(GPIO_NUM_32);
     esp_sleep_enable_ext0_wakeup(GPIO_NUM_25, 0);
     esp_deep_sleep_start();
   }
