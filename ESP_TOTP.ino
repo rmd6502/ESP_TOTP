@@ -27,8 +27,11 @@ BleKeyboard kb;
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
 uint32_t lastInputTime = 0;
+uint32_t lastReadTime = 0;
+double lastBatteryReading = 0;
 
 #define SLEEP_TIME 10000
+#define BATTERY_READ_TIME 1000
 
 char buff[512];
 
@@ -65,10 +68,10 @@ void menuize(int curr, std::vector<Secret> &secrets) {
   static int screenHeight = floor(tft.height()/tft.fontHeight()) - 1;
   bool offsetChanged = false;
   curr = max(0, min((int)secrets.size() - 1, curr));
-  Serial.print("font height "); Serial.println(tft.fontHeight());
-  Serial.print("Curr "); Serial.println(curr);
-  Serial.print("menuoffset "); Serial.println(menuoffset);
-  Serial.print("screenHeight "); Serial.println(screenHeight);
+//  Serial.print("font height "); Serial.println(tft.fontHeight());
+//  Serial.print("Curr "); Serial.println(curr);
+//  Serial.print("menuoffset "); Serial.println(menuoffset);
+//  Serial.print("screenHeight "); Serial.println(screenHeight);
   
   if (curr < menuoffset) {
     menuoffset = curr;
@@ -124,7 +127,9 @@ void setup()
     rtc_gpio_deinit(GPIO_NUM_32);
     rtc_gpio_deinit(GPIO_NUM_33);
     Serial.print("gpio25 "); Serial.println(digitalRead(25));
-    
+
+    tft.init();
+
     kb.begin();
 
     pinMode(ROTARY_ENCODER_GND_PIN, OUTPUT);
@@ -132,7 +137,6 @@ void setup()
     rotaryEncoder.begin();
     rotaryEncoder.setup(readEncoderISR);
 
-    tft.init();
     tft.setRotation(0);
     tft.fillScreen(TFT_BLACK);
     tft.setTextSize(2);
@@ -160,24 +164,35 @@ void setup()
     ESP_WiFiManager ESP_wifiManager("TOTPAP");
     ESP_wifiManager.autoConnect("TOTPAP");
     lastInputTime = millis();
+    pinMode(34, ANALOG);
 }
 
 void loop()
 {
-  if (millis() - lastInputTime >= SLEEP_TIME) {
+  if (lastBatteryReading < 3250.0 && millis() - lastInputTime >= SLEEP_TIME) {
     Serial.println("Sleep");
-    Serial.print("gpio25 "); Serial.println(digitalRead(25));
     digitalWrite(TFT_BL, LOW);
     tft.writecommand(TFT_DISPOFF);
     tft.writecommand(TFT_SLPIN);
     //esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_TIMER);
-    //rtc_gpio_pullup_en(GPIO_NUM_25);
+    rtc_gpio_pullup_en(GPIO_NUM_25);
     rtc_gpio_pullup_en(GPIO_NUM_33);
     rtc_gpio_pulldown_en(GPIO_NUM_32);
+    Serial.print("gpio25 "); Serial.println(digitalRead(25));
     esp_sleep_enable_ext0_wakeup(GPIO_NUM_25, 0);
     esp_deep_sleep_start();
+  } else if (millis() - lastReadTime >= BATTERY_READ_TIME) {
+    uint16_t battLevel = analogRead(34);
+    lastBatteryReading = ((double)battLevel) * 2.0 * 2450.0 / 4096.0;
+    sprintf(buff, "Battery volts: %lf", lastBatteryReading);
+    Serial.println(buff);
+    //tft.drawString(buff, 0, tft.height() - tft.fontHeight());
+    lastReadTime = millis();
+    if (lastBatteryReading >= 3300.0) {
+      lastInputTime = millis();
+    }
   }
-    rotary_loop();
-    // update the time 
-    timeClient.update();
+  rotary_loop();
+  // update the time 
+  timeClient.update();
 }
