@@ -1,3 +1,4 @@
 *.o
 data/secrets
+data/secrets.enc
 .DS_Store

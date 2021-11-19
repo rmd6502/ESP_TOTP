@@ -64,10 +64,11 @@ void IRAM_ATTR readEncoderISR()
 }
 
 void rotary_onButtonClick() {
+  return;
   auto secret = secrets[mainMenu->selectedItem()];
   auto data = secret.secretBytes.data();
   TOTP totp(data, secret.secretBytes.size() , 30);
-
+  timeClient.update();
   auto code = totp.getCode(timeClient.getEpochTime());
   Serial.print("Code ");
   Serial.println(code);
@@ -93,7 +94,6 @@ void setup()
     tft.setTextSize(2);
     tft.setTextColor(TFT_GREEN);
     tft.setCursor(0, 0);
-    tft.setTextDatum(MC_DATUM);
     Serial.println("tft init");
 
     kb.begin();
@@ -108,28 +108,41 @@ void setup()
     tft.setSwapBytes(true);
 
     tft.fillScreen(TFT_BLACK);
-    tft.setTextDatum(MC_DATUM);
+    tft.setTextDatum(TC_DATUM);
     tft.println("Reading Secrets");
 
     SPIFFS.begin();
     secrets = readSecrets();
     Serial.println("read secrets");
     bool circleValues = true;
-    rotaryEncoder.setBoundaries(0, secrets.size(), circleValues);
+//    rotaryEncoder.setBoundaries(0, secrets.size(), circleValues);
     std::vector<std::string> menuItems;
-    for (auto item : secrets) {
-      sprintf(buff, "%s(%s)", item.issuer.c_str(), item.username.c_str());
-      menuItems.push_back(buff);
+//    for (auto item : secrets) {
+//      sprintf(buff, "%s(%s)", item.issuer.c_str(), item.username.c_str());
+//      Serial.println(buff);
+//      menuItems.push_back(buff);
+//    }
+    for (uint8_t ch = 'a'; ch <= 'z'; ++ch) {
+      menuItems.push_back(std::string(1, ch));
     }
+    for (uint8_t ch = '0'; ch <= '9'; ++ch) {
+      menuItems.push_back(std::string(1, ch));
+    }
+    std::vector<std::string> puncts = {
+      "_","+","-","=","!","@","#","$","%","^","&","*","(",")",":",";","\"","'","<",">","?",",",".","/","~","`"
+    };
+    menuItems.insert(menuItems.end(), puncts.begin(), puncts.end());
     mainMenu = new Menu(menuItems, tft);
+    rotaryEncoder.setBoundaries(0, menuItems.size(), circleValues);
 
     tft.println("Connecting to WiFi");
 //    Serial.println("about to connect to wifi");
-//    ESP_WiFiManager ESP_wifiManager("TOTPAP");
-//    ESP_wifiManager.autoConnect("TOTPAP");
+    ESP_WiFiManager ESP_wifiManager("TOTPAP");
+    ESP_wifiManager.autoConnect("TOTPAP");
     lastInputTime = millis();
     pinMode(34, ANALOG);
     Serial.println("connected wifi");
+    tft.fillScreen(TFT_BLACK);
 }
 
 void loop()
@@ -149,8 +162,8 @@ void loop()
   } else if (millis() - lastReadTime >= BATTERY_READ_TIME) {
     uint16_t battLevel = analogRead(34);
     lastBatteryReading = ((double)battLevel) * 2.0 * 2450.0 / 4096.0;
-    sprintf(buff, "Battery volts: %lf", lastBatteryReading);
-    Serial.println(buff);
+    //sprintf(buff, "Battery volts: %lf", lastBatteryReading);
+    //Serial.println(buff);
     //tft.drawString(buff, 0, tft.height() - tft.fontHeight());
     lastReadTime = millis();
     if (lastBatteryReading >= 3200.0) {
@@ -159,6 +172,4 @@ void loop()
   }
   mainMenu->loop();
   rotary_loop();
-  // update the time 
- // timeClient.update();
 }
