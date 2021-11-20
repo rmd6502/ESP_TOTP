@@ -64,7 +64,6 @@ void IRAM_ATTR readEncoderISR()
 }
 
 void rotary_onButtonClick() {
-  return;
   auto secret = secrets[mainMenu->selectedItem()];
   auto data = secret.secretBytes.data();
   TOTP totp(data, secret.secretBytes.size() , 30);
@@ -117,21 +116,21 @@ void setup()
     bool circleValues = true;
 //    rotaryEncoder.setBoundaries(0, secrets.size(), circleValues);
     std::vector<std::string> menuItems;
-//    for (auto item : secrets) {
-//      sprintf(buff, "%s(%s)", item.issuer.c_str(), item.username.c_str());
-//      Serial.println(buff);
-//      menuItems.push_back(buff);
+    for (auto item : secrets) {
+      sprintf(buff, "%s(%s)", item.issuer.c_str(), item.username.c_str());
+      Serial.println(buff);
+      menuItems.push_back(buff);
+    }
+//    for (uint8_t ch = 'a'; ch <= 'z'; ++ch) {
+//      menuItems.push_back(std::string(1, ch));
 //    }
-    for (uint8_t ch = 'a'; ch <= 'z'; ++ch) {
-      menuItems.push_back(std::string(1, ch));
-    }
-    for (uint8_t ch = '0'; ch <= '9'; ++ch) {
-      menuItems.push_back(std::string(1, ch));
-    }
-    std::vector<std::string> puncts = {
-      "_","+","-","=","!","@","#","$","%","^","&","*","(",")",":",";","\"","'","<",">","?",",",".","/","~","`"
-    };
-    menuItems.insert(menuItems.end(), puncts.begin(), puncts.end());
+//    for (uint8_t ch = '0'; ch <= '9'; ++ch) {
+//      menuItems.push_back(std::string(1, ch));
+//    }
+//    std::vector<std::string> puncts = {
+//      "_","+","-","=","!","@","#","$","%","^","&","*","(",")",":",";","\"","'","<",">","?",",",".","/","~","`"
+//    };
+//    menuItems.insert(menuItems.end(), puncts.begin(), puncts.end());
     mainMenu = new Menu(menuItems, tft);
     rotaryEncoder.setBoundaries(0, menuItems.size(), circleValues);
 
