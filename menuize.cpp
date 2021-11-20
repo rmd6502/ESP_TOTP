@@ -1,7 +1,7 @@
 #include "menuize.h"
 
-Menu::Menu(std::vector<std::string> &items, TFT_eSPI &tft) : 
-  mSelectedItem(0), mItems(items), mLastSelected(-1), mMenuoffset(0), mTFT(&tft) {
+Menu::Menu(std::vector<std::string> &items, TFT_eSPI &tft, uint8_t numColumns) : 
+  mSelectedItem(0), mItems(items), mLastSelected(-1), mMenuoffset(0), mTFT(&tft), mNumColumns(numColumns) {
   mScreenHeight = mTFT->height() / mTFT->fontHeight() - 2;
 }
 

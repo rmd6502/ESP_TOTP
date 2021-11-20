@@ -4,7 +4,7 @@
 
 class Menu {
   public:
-    Menu(std::vector<std::string> &items, TFT_eSPI &tft);
+    Menu(std::vector<std::string> &items, TFT_eSPI &tft, uint8_t columns=1);
     void loop();
     void selectItem(uint16_t item);
     uint16_t selectedItem() { return mSelectedItem; }
@@ -15,6 +15,7 @@ class Menu {
     uint16_t mMenuoffset;
     uint16_t mScreenHeight;
     TFT_eSPI *mTFT;
+    uint8_t mNumColumns;
   
     void menuize();
 };
