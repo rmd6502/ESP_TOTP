@@ -1,6 +1,6 @@
 #include "AiEsp32RotaryEncoder.h"
 #include <BleKeyboard.h>
-#define _WIFIMGR_LOGLEVEL_    3
+#define _WIFIMGR_LOGLEVEL_    1
 #include <ESP_WiFiManager.h>
 #include <NTPClient.h>
 #include <SPI.h>
@@ -8,9 +8,12 @@
 #include <TOTP.h>
 #include <TFT_eSPI.h>
 #include <WiFi.h>
+#include <vector>
+#include <string>
 
 #include <driver/rtc_io.h>
 
+#include "menuize.h"
 #include "secrets.h"
 
 #define ROTARY_ENCODER_A_PIN 26
@@ -23,7 +26,8 @@ AiEsp32RotaryEncoder rotaryEncoder = AiEsp32RotaryEncoder(ROTARY_ENCODER_A_PIN, 
 
 TFT_eSPI tft = TFT_eSPI(135, 240); // Invoke custom library
 
-BleKeyboard kb;
+Menu *mainMenu;
+BleKeyboard kb("RMD_TOTP");
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
 uint32_t lastInputTime = 0;
@@ -36,9 +40,6 @@ double lastBatteryReading = 0;
 char buff[512];
 
 std::vector<Secret> secrets;
-uint8_t selected = 0;
-
-void menuize(int curr, std::vector<Secret> &secrets);
 
 void rotary_loop()
 {
@@ -48,7 +49,7 @@ void rotary_loop()
     lastInputTime = millis();
     Serial.print("Value: ");
     Serial.println(rotaryEncoder.readEncoder());
-    menuize(rotaryEncoder.readEncoder(), secrets);
+    mainMenu->selectItem(rotaryEncoder.readEncoder());
   }
   if (rotaryEncoder.isEncoderButtonClicked())
   {
@@ -62,54 +63,11 @@ void IRAM_ATTR readEncoderISR()
   rotaryEncoder.readEncoder_ISR();
 }
 
-void menuize(int curr, std::vector<Secret> &secrets) {
-  static int last = -1;
-  static int menuoffset = 0;
-  static int screenHeight = floor(tft.height()/tft.fontHeight()) - 1;
-  bool offsetChanged = false;
-  curr = max(0, min((int)secrets.size() - 1, curr));
-//  Serial.print("font height "); Serial.println(tft.fontHeight());
-//  Serial.print("Curr "); Serial.println(curr);
-//  Serial.print("menuoffset "); Serial.println(menuoffset);
-//  Serial.print("screenHeight "); Serial.println(screenHeight);
-  
-  if (curr < menuoffset) {
-    menuoffset = curr;
-    offsetChanged = true;
-  } else if (curr + menuoffset > screenHeight) {
-    menuoffset = curr - screenHeight;
-    offsetChanged = true;
-  }
-
-  if (offsetChanged || last == -1) {
-    int currentLine = menuoffset;
-    for (int i=0; i < min(screenHeight, (int)secrets.size() - menuoffset); ++i) {
-      if (currentLine == curr) {
-        tft.setTextColor(TFT_BLACK, TFT_PINK);
-      } else {
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
-      }
-      tft.drawString(secrets[currentLine++].issuer.c_str(), 0, i * tft.fontHeight() + 8);
-    }
-  } else {
-    //tft.fillRoundRect(0,(curr - menuoffset) * tft.fontHeight(),tft.textWidth(secrets[curr].issuer.c_str()),8,2,TFT_PINK);
-    tft.setTextColor(TFT_BLACK, TFT_PINK);
-    tft.drawString(secrets[curr].issuer.c_str(),0,(curr - menuoffset) * tft.fontHeight() + 8);
-    if (last > -1 && last != curr && last >= menuoffset && last + menuoffset <= screenHeight) {
-      //tft.fillRoundRect(0,(last - menuoffset) * tft.fontHeight(),tft.textWidth(secrets[last].issuer.c_str()),8,2,TFT_BLACK);
-      tft.setTextColor(TFT_GREEN, TFT_BLACK);
-      tft.drawString(secrets[last].issuer.c_str(),0,last * tft.fontHeight() + 8);
-    }
-  }
-  selected = curr;
-  last = curr;
-}
-
 void rotary_onButtonClick() {
-  auto secret = secrets[selected];
+  auto secret = secrets[mainMenu->selectedItem()];
   auto data = secret.secretBytes.data();
   TOTP totp(data, secret.secretBytes.size() , 30);
-
+  timeClient.update();
   auto code = totp.getCode(timeClient.getEpochTime());
   Serial.print("Code ");
   Serial.println(code);
@@ -130,46 +88,65 @@ void setup()
 
     tft.init();
 
-    kb.begin();
-
-    pinMode(ROTARY_ENCODER_GND_PIN, OUTPUT);
-    digitalWrite(ROTARY_ENCODER_GND_PIN, LOW);
-    rotaryEncoder.begin();
-    rotaryEncoder.setup(readEncoderISR);
-
     tft.setRotation(0);
     tft.fillScreen(TFT_BLACK);
     tft.setTextSize(2);
     tft.setTextColor(TFT_GREEN);
     tft.setCursor(0, 0);
-    tft.setTextDatum(MC_DATUM);
+    Serial.println("tft init");
 
-    /*
-    if (TFT_BL > 0) {                           // TFT_BL has been set in the TFT_eSPI library in the User Setup file TTGO_T_Display.h
-        pinMode(TFT_BL, OUTPUT);                // Set backlight pin to output mode
-        digitalWrite(TFT_BL, TFT_BACKLIGHT_ON); // Turn backlight on. TFT_BACKLIGHT_ON has been set in the TFT_eSPI library in the User Setup file TTGO_T_Display.h
-    }
-    */
+    kb.begin();
+    Serial.println("kb init");
+
+    pinMode(ROTARY_ENCODER_GND_PIN, OUTPUT);
+    digitalWrite(ROTARY_ENCODER_GND_PIN, LOW);
+    rotaryEncoder.begin();
+    rotaryEncoder.setup(readEncoderISR);
+    Serial.println("rotary init");
 
     tft.setSwapBytes(true);
 
     tft.fillScreen(TFT_BLACK);
-    tft.setTextDatum(MC_DATUM);
+    tft.setTextDatum(TC_DATUM);
+    tft.println("Reading Secrets");
 
     SPIFFS.begin();
     secrets = readSecrets();
+    Serial.println("read secrets");
     bool circleValues = true;
-    rotaryEncoder.setBoundaries(0, secrets.size(), circleValues);
-    menuize(0, secrets);
+//    rotaryEncoder.setBoundaries(0, secrets.size(), circleValues);
+    std::vector<std::string> menuItems;
+    for (auto item : secrets) {
+      sprintf(buff, "%s(%s)", item.issuer.c_str(), item.username.c_str());
+      Serial.println(buff);
+      menuItems.push_back(buff);
+    }
+//    for (uint8_t ch = 'a'; ch <= 'z'; ++ch) {
+//      menuItems.push_back(std::string(1, ch));
+//    }
+//    for (uint8_t ch = '0'; ch <= '9'; ++ch) {
+//      menuItems.push_back(std::string(1, ch));
+//    }
+//    std::vector<std::string> puncts = {
+//      "_","+","-","=","!","@","#","$","%","^","&","*","(",")",":",";","\"","'","<",">","?",",",".","/","~","`"
+//    };
+//    menuItems.insert(menuItems.end(), puncts.begin(), puncts.end());
+    mainMenu = new Menu(menuItems, tft);
+    rotaryEncoder.setBoundaries(0, menuItems.size(), circleValues);
+
+    tft.println("Connecting to WiFi");
+//    Serial.println("about to connect to wifi");
     ESP_WiFiManager ESP_wifiManager("TOTPAP");
     ESP_wifiManager.autoConnect("TOTPAP");
     lastInputTime = millis();
     pinMode(34, ANALOG);
+    Serial.println("connected wifi");
+    tft.fillScreen(TFT_BLACK);
 }
 
 void loop()
 {
-  if (lastBatteryReading < 3250.0 && millis() - lastInputTime >= SLEEP_TIME) {
+  if (lastBatteryReading < 3200.0 && millis() - lastInputTime >= SLEEP_TIME) {
     Serial.println("Sleep");
     digitalWrite(TFT_BL, LOW);
     tft.writecommand(TFT_DISPOFF);
@@ -184,15 +161,14 @@ void loop()
   } else if (millis() - lastReadTime >= BATTERY_READ_TIME) {
     uint16_t battLevel = analogRead(34);
     lastBatteryReading = ((double)battLevel) * 2.0 * 2450.0 / 4096.0;
-    sprintf(buff, "Battery volts: %lf", lastBatteryReading);
-    Serial.println(buff);
+    //sprintf(buff, "Battery volts: %lf", lastBatteryReading);
+    //Serial.println(buff);
     //tft.drawString(buff, 0, tft.height() - tft.fontHeight());
     lastReadTime = millis();
-    if (lastBatteryReading >= 3300.0) {
+    if (lastBatteryReading >= 3200.0) {
       lastInputTime = millis();
     }
   }
+  mainMenu->loop();
   rotary_loop();
-  // update the time 
-  timeClient.update();
 }

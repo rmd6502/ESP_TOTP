@@ -1,5 +1,7 @@
 #include "secrets.h"
 
+#include <mbedtls/aes.h>
+
 #include <Arduino.h>
 #include <SPIFFS.h>
 
