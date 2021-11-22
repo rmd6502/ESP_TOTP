@@ -128,7 +128,7 @@ void setup()
       menuItems.push_back(std::string(1, ch));
     }
     std::vector<std::string> puncts = {
-      "_","+","-","=","!","@","#","$","%","^","&","*","(",")",":",";","\"","'","<",">","?",",",".","/","~","`"
+      "_","+","-","=","!","@","#","$","%","^","&","*","(",")",":",";","\"","'","<",">","?",",",".","/","~","`","Sh","Ok"
     };
     menuItems.insert(menuItems.end(), puncts.begin(), puncts.end());
     mainMenu = new Menu(menuItems, tft, 5);

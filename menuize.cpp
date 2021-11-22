@@ -10,6 +10,14 @@ Menu::Menu(std::vector<std::string> &items, TFT_eSPI &tft, uint8_t numColumns) :
   mScreenHeight = mTFT->height() / mTFT->fontHeight() - 2;
 }
 
+void Menu::setItems(std::vector<std::string> &items, uint8_t numColumns) {
+  mItems = items;
+  mNumColumns = numColumns;
+  mSelectedItem = 0;
+  mLastSelected = -1;
+  mMenuoffset = 0;
+}
+
 void Menu::selectItem(uint16_t newItem) {
   mSelectedItem = newItem;
 }
@@ -24,21 +32,21 @@ void Menu::menuize() {
   bool offsetChanged = false;
   mSelectedItem = max(0, min((int)(mItems.size() - 1), (int)mSelectedItem));
 //  Serial.print("font height "); Serial.println(mTFT->fontHeight());
-  Serial.print("mSelectedItem "); Serial.println(mSelectedItem);
-  Serial.print("mMenuoffset "); Serial.println(mMenuoffset);
-  Serial.print("screenHeight "); Serial.println(mScreenHeight);
-  Serial.println();
+//  Serial.print("mSelectedItem "); Serial.println(mSelectedItem);
+//  Serial.print("mMenuoffset "); Serial.println(mMenuoffset);
+//  Serial.print("screenHeight "); Serial.println(mScreenHeight);
+//  Serial.println();
   uint16_t row = 0, col = 0;
 
   itemToOffset(mSelectedItem, mNumColumns, col, row);
   if (row < mMenuoffset) {
     mMenuoffset = row;
     offsetChanged = true;
-    Serial.print("menuoffset up to ");Serial.println(mMenuoffset);
+//    Serial.print("menuoffset up to ");Serial.println(mMenuoffset);
   } else if (row - mMenuoffset >= mScreenHeight) {
     mMenuoffset = row - mScreenHeight + 1;
     offsetChanged = true;
-    Serial.print("menuoffset down to ");Serial.println(mMenuoffset);
+//    Serial.print("menuoffset down to ");Serial.println(mMenuoffset);
   }
   
   uint16_t colWidth = mTFT->width() / mNumColumns;

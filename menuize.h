@@ -8,6 +8,7 @@ class Menu {
     void loop();
     void selectItem(uint16_t item);
     uint16_t selectedItem() { return mSelectedItem; }
+    void setItems(std::vector<std::string> &items, uint8_t columns=1);
   private:
     uint16_t mSelectedItem;
     std::vector<std::string> mItems;
