@@ -116,22 +116,22 @@ void setup()
     bool circleValues = true;
 //    rotaryEncoder.setBoundaries(0, secrets.size(), circleValues);
     std::vector<std::string> menuItems;
-    for (auto item : secrets) {
-      sprintf(buff, "%s(%s)", item.issuer.c_str(), item.username.c_str());
-      Serial.println(buff);
-      menuItems.push_back(buff);
+//    for (auto item : secrets) {
+//      sprintf(buff, "%s(%s)", item.issuer.c_str(), item.username.c_str());
+//      Serial.println(buff);
+//      menuItems.push_back(buff);
+//    }
+    for (uint8_t ch = 'a'; ch <= 'z'; ++ch) {
+      menuItems.push_back(std::string(1, ch));
     }
-//    for (uint8_t ch = 'a'; ch <= 'z'; ++ch) {
-//      menuItems.push_back(std::string(1, ch));
-//    }
-//    for (uint8_t ch = '0'; ch <= '9'; ++ch) {
-//      menuItems.push_back(std::string(1, ch));
-//    }
-//    std::vector<std::string> puncts = {
-//      "_","+","-","=","!","@","#","$","%","^","&","*","(",")",":",";","\"","'","<",">","?",",",".","/","~","`"
-//    };
-//    menuItems.insert(menuItems.end(), puncts.begin(), puncts.end());
-    mainMenu = new Menu(menuItems, tft);
+    for (uint8_t ch = '0'; ch <= '9'; ++ch) {
+      menuItems.push_back(std::string(1, ch));
+    }
+    std::vector<std::string> puncts = {
+      "_","+","-","=","!","@","#","$","%","^","&","*","(",")",":",";","\"","'","<",">","?",",",".","/","~","`","Sh","Ok"
+    };
+    menuItems.insert(menuItems.end(), puncts.begin(), puncts.end());
+    mainMenu = new Menu(menuItems, tft, 5);
     rotaryEncoder.setBoundaries(0, menuItems.size(), circleValues);
 
     tft.println("Connecting to WiFi");
